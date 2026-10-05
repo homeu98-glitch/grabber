@@ -1,0 +1,686 @@
+
+[1] 🔴 MacauPay 訊息：只有 action、沒有 type（回歸重點）
+  ✓ manualGrab 有觸發（keepSessionAlive 打 dashboard）
+  ✓ manualGrab 有觸發（打 listData 抓資料）
+  ✓ 完全沒打任何網路請求 = 路由被吃掉
+  ✓ stopTimer 有執行
+
+[2] 擷取來源訊息：只有 type、沒有 action
+  ✓ MFOOD_GET_DASHBOARD 有回應
+  ✓ 回傳的來源正確
+  ✓ 回傳含標籤
+  ✓ 回傳含 state
+  ✓ 回傳含 settings
+  ✓ 預設不推送
+  ✓ AOMI_GET_DASHBOARD 回傳來源正確
+  ✓ 澳覓不支援頁面統計
+
+[3] 兩種形狀在同一支 listener 內互不干擾
+  ✓ 先送 type 訊息 OK
+  ✓ 接著送 action 訊息仍能觸發
+  ✓ 再送 type 訊息仍 OK
+
+[4] 擷取流程寫入日誌與去重
+  ✓ 有寫入日誌
+  ✓ 有寫入列表日誌
+  ✓ 列表日誌等級為新單
+  ✓ 第二次被判定為重複
+  ✓ 新單計數仍為 1
+
+[5] 防禦性：壞訊息不應崩潰
+  ✓ 送出 5 種壞訊息後仍存活
+  ✓ 壞訊息之後仍能正常回應
+
+[6] 未知來源前綴不會被誤路由
+  ✓ 未知前綴不回傳 dashboard
+
+[7] cut-off date 過濾（全域設定，mfood）
+  ✓ 早於 cut-off 的單不計為新單
+  ✓ 有記錄 skippedByCutoff
+  ✓ 日誌有標示略過筆數
+  ✓ 日誌摘要提到 cut-off
+  ✓ 放寬 cut-off 後同一張單仍被視為新單
+
+[8] cut-off date 過濾（澳覓的本地時間字串）
+  ✓ 澳覓早於 cut-off 的單被略過
+  ✓ 放寬後被視為新單
+
+[9] 設定形狀：不應再有端點與密鑰欄位
+  ✓ settings 不含 posEndpoint
+  ✓ settings 不含 posSecret
+  ✓ 仍保留 pushEnabled
+
+[10] 逐單發送狀態註冊表
+  ✓ 兩筆都登記了
+  ✓ 未啟用同步 → 狀態 held（待同步；2026-09-25 由 observed 改，方便開啟同步時精準補送）
+  ✓ 金額有帶入顯示欄位
+  ✓ 時間有帶入
+  ✓ 重複次數初始為 0
+  ✓ at 為 ISO 可排序
+  ✓ 重複被累加
+  ✓ 沒有重複登記（仍為 2 筆）
+  ✓ 重複次數持續累加
+
+[11] 🔴 已設密鑰 → 啟用同步就會真的打 POS 端點，並標記 sent
+  ✓ 狀態為 sent（推送成功）
+  ✓ 嘗試次數為 1
+  ✓ 🔴 確實有打 POS 端點
+  ✓ 🔴 打嘅係 grabber 收單路徑
+  ✓ 冇殘留錯誤訊息
+  ✓ 🔴 payload 有 storeId 而且唔係空
+  ✓ 🔴 payload.orders 係陣列（唔可以變成 settings 物件）
+  ✓ 🔴 payload.orders 帶到單號
+  ✓ 🔴 有帶密鑰標頭
+
+[12] 詳情也會登記逐單狀態
+  ✓ 詳情帶來的單有登記
+  ✓ 金額取客人實付
+  ✓ 時間用 occurredAt
+
+[13] 🔴 舊版時期已抓過的單，仍須出現在清單（本次 bug 回歸測試）
+  ✓ 已見過的單仍被登記（清單不會空白）
+  ✓ 標為 observed（歷史資料，本次不送出）
+  ✓ 金額有帶入
+  ✓ 沒有被誤判為新單
+  ✓ 重複次數有累加
+
+[14] 重新整理不得把已送出的狀態降級
+  ✓ 狀態仍為 sent（沒被降級）
+  ✓ attempts 未被歸零
+  ✓ 重複次數持續累加
+
+[15] 重新掃描（不需要 tabs 權限）
+  ✓ 沒有分頁時回 ok:false
+  ✓ 錯誤訊息提到 F5
+  ✓ PAGE_READY 記住分頁 id
+  ✓ 有分頁時回 ok:true
+  ✓ 訊息送到正確的分頁
+  ✓ 訊息類型正確
+  ✓ 澳覓尚未回報過分頁 → ok:false
+
+[16] 🔴 診斷匯出：敏感值必須被遮蔽
+  ✓ 診斷有回傳
+  ✓ 含版本號
+  ✓ 含全部來源
+  ✓ 含遮蔽說明備註
+  ✓ 沒有外流 cookie 值
+  ✓ 沒有外流 authorization
+  ✓ 沒有外流簽章
+  ✓ 但保留標頭名稱（仍能判斷有沒有帶憑證）
+  ✓ 日誌有記錄範本擷取
+
+[17] 自動化開關預設必須是關的
+  ✓ autoRefresh 預設關
+  ✓ autoFetchDetails 預設關
+  ✓ detailDelayMs 有預設值
+  ✓ maxDetailsPerRun 有預設值
+
+[18] 品項合併進註冊表
+  ✓ 品項有寫進註冊表
+  ✓ itemCount 正確
+  ✓ detailState = done
+  ✓ tradeNo 有記下來（DOM 定位要用）
+
+[19] 定時查詢（autoTick）
+  ✓ 未開啟 autoRefresh 時不動作
+  ✓ 開啟後送出重新掃描
+  ✓ 有記錄 lastAutoRefreshAt
+  ✓ 同一分鐘內不重複觸發（有節流）
+
+[20] 自動抓詳情：未開啟時不派工
+  ✓ 未開啟 autoFetchDetails 時不派工
+  ✓ 訂單仍在註冊表中（只是沒抓品項）
+
+[21] 舊版遺留的設定欄位會被清掉
+  ✓ posEndpoint 不再回傳
+  ✓ posSecret 不再回傳
+  ✓ pushTerminalStates 不再回傳
+  ✓ 已知欄位仍保留
+  ✓ 舊密鑰不會出現在輸出中
+
+[22] 🔴 autoTick 會派工抓詳情（不依賴列表事件）
+  ✓ 未開啟時不派工
+  ✓ 只開自動抓詳情也會派工
+  ✓ 沒有誤觸發重新掃描
+  ✓ 派工只帶沒品項的單
+
+[23] 🔴 手動抓取品項不受「自動開關」限制
+  ✓ 手動觸發成功（不受開關限制）
+  ✓ 回報派工筆數
+  ✓ 確實有送出派工訊息
+
+[24] 🔴 抓不到品項時必須回報原因，不得靜默失敗
+  ✓ 沒有任何訂單時回 ok:false
+  ✓ 並說明原因（不是 undefined）
+  ✓ 全部已取得品項時回 ok:false
+  ✓ 🔴 說明「已取得過品項、不再重複拿取」
+  ✓ 🔴 並回報有幾筆是已抓過的（名冊有在運作）
+
+[25] 🔴「開始」= 三個平台的總開關
+  ✓ mfood 初始為關
+  ✓ aomi 初始為關
+  ✓ 回報成功
+  ✓ 涵蓋 2 個來源
+  ✓ mfood autoRefresh 開啟
+  ✓ mfood autoFetchDetails 開啟
+  ✓ aomi autoRefresh 開啟
+  ✓ aomi autoFetchDetails 開啟
+  ✓ 按下後立即觸發一次查詢（不用等下一拍）
+
+[26] 🔴「停止」= 三個平台全部停掉
+  ✓ 回報 enabled=false
+  ✓ mfood 定時查詢關閉
+  ✓ mfood 抓詳情關閉
+  ✓ aomi 定時查詢關閉
+  ✓ 停止後不再自動查詢
+
+[27] alarm 週期為 30 秒（瀏覽器下限）
+  ✓ grabAutoTick 已註冊
+  ✓ 週期 0.5 分鐘 = 30 秒
+
+[28] 🔴 派工失敗不得消耗重試配額（「卡在抓取品項中」的根因）
+  ✓ 第 1 次派工失敗有原因
+  ✓ 第 2 次派工失敗有原因
+  ✓ 第 3 次派工失敗有原因
+  ✓ 第 4 次派工失敗有原因
+  ✓ 重試次數沒有被消耗（仍為 0）
+  ✓ 狀態沒有卡在 fetching
+  ✓ 補上分頁後仍能派工（配額沒被吃光）
+
+[29] 卡在 fetching 超過 2 分鐘視為可重試
+  ✓ 過期後可重新派工
+
+[30] 剛派工過的不要重複派，且說明是「抓取中」
+  ✓ 不重複派工
+  ✓ 原因說明是「抓取中」而不是「都已取得品項」
+
+[31] 🔴 cut-off 要清掉「先前已登記」但超出範圍的舊單
+  ✓ 09-10 的舊單被清除
+  ✓ 08-20 的舊單被清除
+  ✓ 範圍內的單保留
+  ✓ 有記錄清除數量
+  ✓ 日誌有提到清除（不是靜默）
+
+[32] popup 的「開始」要夾住 30 秒下限
+  ✓ 填 10 → 30
+  ✓ 填 30 → 30
+  ✓ 填 60 → 60
+  ✓ 填 0（無效）→ 60
+  ✓ 空字串 → 60
+
+[33] 🔴 清除所有訂單：清 orders、保留 seen（避免重複出單）
+  ✓ 清除前有訂單
+  ✓ 清除前有去重記錄
+  ✓ 回報成功
+  ✓ 訂單已清空
+  ✓ 🔴 去重記錄必須保留（否則會重複出單）
+
+[34] 套用同步間隔（可低於 30 秒）
+  ✓ 回報成功
+  ✓ 回報秒數
+  ✓ 有把間隔推給內容腳本
+  ✓ 可以推 0 來關閉計時
+
+[35] 套用日期並逐頁抓全部
+  ✓ 回報成功
+  ✓ 有送出範圍同步指令
+  ✓ 有寫入日誌
+
+[36] 🔴 頁面太久沒回報 → 自動重新載入（自我修復）
+  ✓ 未開啟自動時不重載
+  ✓ 🔴 內容腳本活住時唔應該重載（資料過期 ≠ 頁面壞）
+  ✓ 有呼叫 tabs.reload
+  ✓ 有記錄 lastAutoReloadAt
+  ✓ 有寫入自動重載日誌
+  ✓ 冷卻期內不重複重載（避免無限重載）
+
+[37] 自動重載可用開關關閉
+  ✓ 關掉後不重載
+
+[38] 剛擷取過就不該重載
+  ✓ 剛擷取過不重載
+
+[39] 🔴 澳覓已取消／待退款：只記錄不推送，且不佔用去重記錄
+  ✓ 🔴 不算新單（因此不會被推送）
+  ✓ 🔴 但仍會登記，清單看得到
+  ✓ 🔴 狀態為 observed（只記錄）
+  ✓ 訂單編號仍有帶入
+  ✓ 🔴 沒有寫入 seen
+  ✓ 日誌要說明只記錄不推送
+
+[40] 對照組：同一張單走正常輪次就會算新單並寫入 seen
+  ✓ 有算為新單
+  ✓ 有寫入 seen
+  ✓ 日誌不該出現只記錄字樣
+
+[41] 🔴 同步結果要寫明「日期有沒有真的套用」
+  ✓ 有寫入同步日誌
+  ✓ 🔴 明說日期未能套用
+  ✓ 🔴 明說日期已套用且寫出格式
+  ✓ 帶出回讀驗證結果
+
+[42] 🔴 已拿過品項的單，連手動 force 都不再派工
+  ✓ 第一次有派工
+  ✓ 🔴 名冊用訂單號記下了
+  ✓ 不再派工
+  ✓ 🔴 手動 force 也不再派工
+  ✓ 訊息說明已抓過、不再重複
+
+[43] 🔴 註冊表被重建後，名冊仍阻止重複拿取
+  ✓ 重新登記了
+  ✓ 🔴 名冊把狀態補回 done
+  ✓ 🔴 不會被重新抓取
+
+[44] 🔴 清除所有訂單要一併清掉名冊（否則永遠不再抓品項）
+  ✓ 名冊有記錄
+  ✓ 🔴 名冊已清空（否則那些單永遠不會再抓品項）
+
+[45] 🔴 模擬點擊的重試上限比請求重放低（少開彈窗）
+  ✓ 🔴 澳覓（模擬點擊）已達上限 2 → 不再派工
+  ✓ 只重試 1 次時仍會派工
+
+[46] 🔴 建假訂單：推送 payload 一定要係非空陣列（回歸）
+  ✓ 回報成功
+  ✓ 🔴 確實有發請求
+  ✓ 🔴 payload.orders 係陣列
+  ✓ 🔴 payload.orders 唔可以係空（空 = POS 收到 0 張單）
+  ✓ 🔴 假單有帶 storeId
+  ✓ 🔴 假單有帶來源
+
+[47] 🔴 grabPush 收到非陣列 orders 要即刻報錯，唔准靜默送出
+  ✓ 🔴 澳覓假單一樣係非空陣列
+  ✓ 🔴 澳覓假單用真 bridge 嘅欄位名（storeSeq / localOrderNo）
+
+[48] 🔴 假單要同真實 bridge 用同一套欄位名（防止假資料掩蓋真 bug）
+  ✓ mfood：用真 bridge 嘅 orderNumber
+  ✓ mfood：orderStatus = completed
+  ✓ mfood：transactionStatus = paid
+  ✓ mfood：fulfillmentType 係 delivery / pickup（真解碼值）
+  ✓ mfood：amount.businessAmount 係正數
+  ✓ mfood：費用欄位用 POS 讀嘅正規化名（boxFee / plasticBagFee / fullReductionAmount）
+  ✓ 🔴 mfood：businessAmount 同官方公式一致
+  ✓ mfood：items 有 displayName / quantity / unitPrice
+  ✓ 澳覓：用真 bridge 嘅 storeSeq / localOrderNo
+  ✓ 🔴 澳覓：唔應該再出 storeSeqNo（真 bridge 冇呢個名）
+  ✓ 澳覓：stateEnum 含 ORDER（POS 靠 ASCII enum 判生命週期）
+  ✓ 澳覓：occurredAt 有值
+  ✓ 澳覓：amount.turnoverAmount 係正數
+  ✓ 澳覓：費用欄位用 POS 讀嘅名（boxAmt / plasticAmt / merchantActAmt / sendAmt）
+  ✓ 🔴 澳覓：turnoverAmount 同官方公式一致
+  ✓ 澳覓：items 有 name / displayName / quantity / unitPrice
+  ✓ 可以一次建多張（count = 5）
+  ✓ 🔴 同一批嘅外部單號全部唯一
+  ✓ 🔴 同一批嘅顯示單號全部唯一
+  ✓ 🔴 兩次呼叫嘅外部單號唔會撞
+
+[49] 🔴 未啟用同步 → 標 held；開啟同步會放行補送（2026-09-25 實案）
+  ✓ 未啟用同步 → 狀態 held
+  ✓ 冇打 POS 端點
+  ✓ 日誌講明會自動補送
+  ✓ 觀察模式下重複仍會被攔（duplicatesSkipped = 1）
+  ✓ 仍然係 held（冇被重複改壞）
+  ✓ 仍然冇打 POS
+  ✓ 設定已儲存
+  ✓ 🔴 去重名冊已放行（HLD1 唔再喺 seen）
+  ✓ 有寫放行日誌（mfood_release_held）
+  ✓ 🔴 補送成功（狀態 sent）
+  ✓ 🔴 真係有打 POS 端點
+
+[50] 🔴 自動重載冷卻：3 分鐘內唔可以再 reload（獨立 key 版）
+  ✓ 第一次應該要 reload
+  ✓ 🔴 冷卻時間戳寫入專用 key
+  ✓ 🔴 state 欄位被抹走都唔可以再 reload（冷卻以專用 key 為準）
+
+[51] 🔴 假單唔會派工抓詳情（每 30 秒失敗重試）
+  ✓ 有派工
+  ✓ 🔴 派工名單一定唔含假單
+  ✓ 真單照樣派工
+
+[52] 🔴 推送 payload 一定要帶品項（POS 對冇品項嘅單會拒收）
+  ✓ 🔴 payload 帶到註冊表嘅品項
+  ✓ 品項名冇走樣
+  ✓ 原本嘅列表欄位仍在
+
+[53] 🔴 POS 回 rejected[] → 一定要標 failed（唔可以靜默假成功）
+  ✓ 🔴 狀態係 failed（唔可以係 sent）
+  ✓ 錯誤訊息帶住 POS 嘅拒收原因
+  ✓ 日誌唔可以出現「已送出」
+  ✓ 日誌要寫明拒收
+
+[54] 🔴 POS 回 created:0 但冇 rejected（＝重複單）→ 仍然算成功
+  ✓ 已經喺 POS（重複）唔算失敗
+
+[55] 🔴 推送失敗會自動放行重試，並受重試上限保護
+  ✓ 🔴 未達上限嘅失敗單已放行（seen 冇咗 F1）
+  ✓ 放行後狀態轉回 pending
+  ✓ 🔴 已達上限（attempts 999）嘅唔再放行（唔會無限重試）
+  ✓ 已達上限嘅維持 failed（大聲示人）
+  ✓ 有寫重試日誌
+  ✓ 🔴 兩分鐘冷卻期內唔會重試
+
+[56] 🔴 成功撳到「查詢」但長時間冇列表回報 → 一定要出警示（唔可以綠燈藏住）
+  ✓ 🔴 要有警示（唔可以係 null）
+  ✓ 警示要叫商家 F5
+  ✓ 警示要講清楚係冇回報列表
+
+[57] 🔴 有列表回報就唔應該再掛住「有問題」橫幅（假警報）
+  ✓ 🔴 收到列表之後要清走錯誤（管道證明通咗）
+
+[58] 🔴 啟用同步會強制開自動查詢／自動抓品項／自動重載（介面已冇呢三個開關）
+  ✓ autoRefresh 被強制開
+  ✓ autoFetchDetails 被強制開（冇品項 POS 一定拒收）
+  ✓ autoReload 被強制開
+  ✓ 淨改其他設定時唔會被強制還原
+
+[59] 🔴 查店名（輸入 Store ID 之後顯示係邊間店）
+  ✓ 查到店名
+  ✓ 有打 store 端點
+  ✓ 有帶 X-Grabber-Secret
+  ✓ body 帶 storeId
+  ✓ 查唔到要回原因（唔可以靜默）
+  ✓ 空 ID 本地擋住（唔打端點）
+
+[60] 🔴 按「開始」自動整備 mfood 頁面（訂單狀態＝全部 → 重新載入）
+  ✓ 🔴 有叫分頁把「訂單狀態」切去「全部」
+  ✓ 係送去 mfood 分頁
+  ✓ 🔴 唔應該重新載入整個頁面（只代按查詢）
+  ✓ 有寫整備日誌（唔可以靜默）
+  ✓ 🔴 有代按「查詢」重新查詢
+  ✓ 日誌有講明已代按查詢
+
+[61] 🔴 存活探測：分頁有回應就寫 lastAliveAt
+  ✓ 🔴 有回應 → 寫 lastAliveAt
+
+[62] 🔴 撳到查詢但攔截器冇見到請求 → 一定要出聲（唔可以當成功）
+  ✓ 🔴 要寫 error 日誌講明攔截器冇見到請求
+  ✓ 🔴 橫幅要即刻轉紅（唔使等 3 個週期）
+  ✓ 對照組：攔截器正常時唔應該出 error
+
+[63] 🔴 平台結算（實收）：抓財務頁 → 推 POS settlement 端點
+  ✓ 回報成功
+  ✓ 🔴 有問過分頁清單（要靠 query 搵財務頁）
+  ✓ 🔴 有送 MFOODFIN_SYNC 去財務頁
+  ✓ 🔴 有帶商家名落去（多店唔選會配錯單）
+  ✓ 🔴 有帶目標日期（今日）
+  ✓ 🔴 有打 settlement 端點
+  ✓ 有帶密鑰標頭
+  ✓ body.storeId 正確
+  ✓ body.source 為 mfood
+  ✓ 🔴 transactions 係非空陣列
+  ✓ 🔴 原樣轉送平台欄位名（改名係 POS 嘅責任）
+  ✓ 🔴 有帶 periodAmounts
+  ✓ 🔴 periodAmounts.receive
+  ✓ 🔴 periodAmounts.should
+  ✓ 🔴 periodAmounts.fee
+  ✓ 🔴🔴 periodAmounts.subsidy 一定要傳（POS 補貼後優先）
+  ✓ 有記錄上次對帳時間
+  ✓ 成功時唔應該留低錯誤
+  ✓ 🔴 有記錄帳期 id 來源（2026-09-28 新增）
+
+[63b] 🔴🔴🔴 只填 Store ID（machineId）就要對帳成功 —— 唔可以讀錯 key
+  ✓ 🔴 前置條件：storage 冇 storeId key
+  ✓ 🔴🔴🔴 對帳成功（唔可以再報未設定 Store ID）
+  ✓ 🔴 失敗原因唔可以係「未設定 Store ID」
+  ✓ 🔴 有打 POS 結算端點
+  ✓ 🔴 body.storeId 要係 machineId 嗰個值
+
+[64] 🔴 結算要有低頻節流（唔可以每個 tick 都問平台）
+  ✓ 手動第一次有同步
+  ✓ 🔴 手動唔受節流（使用者按就要跑）
+  ✓ 🔴 6 小時內自動對帳被節流（唔會每個 tick 問平台）
+  ✓ 🔴 超過 6 小時後自動對帳放行
+
+[65] 🔴 結算失敗一定要大聲回報（唔可以靜默）
+  ✓ 冇財務頁 → ok:false
+  ✓ 🔴 講清楚要開邊個頁
+  ✓ 有記錄落 state
+  ✓ 有寫錯誤日誌
+  ✓ 內容腳本死 → ok:false
+  ✓ 🔴 提示要 F5
+  ✓ 🔴 未填商家名時仍然同步（storeName 送空字串＝跟後台預設）
+  ✓ 冇 Store ID → ok:false
+  ✓ 🔴 提示指向「店家設定」
+  ✓ 🔴 唔應該打任何請求（本地擋住）
+
+[66] 🔴 帳期內冇 transaction ＝ 唔算失敗（唔可以誤報）
+  ✓ 空帳期 → ok:true（唔算失敗）
+  ✓ pushed 為 0
+  ✓ 🔴 唔應該留下錯誤
+  ✓ 🔴 唔應該亂打 POS（冇嘢好推）
+
+[66b] 🔴🔴 零重放：帳期級金額要送 POS（即使冇逐筆 transaction）
+  ✓ 🔴 有打 POS 結算端點
+  ✓ 🔴 有帶 periodAmounts
+  ✓ 🔴🔴 實收金額送到 POS
+  ✓ 🔴 應收金額送到 POS
+  ✓ 🔴 服務費送到 POS
+  ✓ 🔴 金額來源如實標示
+  ✓ 回報成功
+
+[67] 對帳頁結構診斷（GRAB_SETTLE_DOMDUMP）—— 只讀、唔可以撳嘢
+  ✓ 有財務頁 → ok:true
+  ✓ 真係轉發 dump（原樣回）
+  ✓ 🔴 dump 真係帶住結構（唔可以回一個空殼）
+  ✓ 冇財務頁 → ok:false
+  ✓ 🔴 講清楚要開邊個頁
+  ✓ 內容腳本死 → ok:false
+  ✓ 🔴 提示要 F5
+  ✓ 🔴 診斷唔應該打任何 POS 請求
+
+[68] 🔴 分頁開喺財務頁 → 篩選設定要「略過」而唔係「失敗」
+  ✓ 🔴 有寫「略過」日誌
+  ✓ 🔴 略過唔可以係 error 級
+  ✓ 🔴 唔應該有 error 級嘅 page_prepare 日誌（假警報）
+
+[69] 🔴🔴🔴 GRAB_FINANCE_RAW：拿全部訂單（唔配對、唔推 POS）
+  ✓ 有財務頁 → ok:true
+  ✓ 🔴 原樣轉發帳期列
+  ✓ 🔴 原樣轉發明細列
+  ✓ 🔴 明細保留平台欄位（tradeNo）
+  ✓ 🔴 唔應該有 updated（唔做配對）
+  ✓ 🔴 唔應該有 notFound（唔做配對）
+  ✓ 🔴 拿全部訂單唔應該打任何 POS 請求
+  ✓ 冇財務頁 → ok:false
+  ✓ 🔴 講清楚要開邊個頁
+  ✓ 內容腳本死 → ok:false
+  ✓ 🔴 提示要 F5
+  ✓ 🔴🔴 重新注入成功後 → 應該 ok:true（唔會再要使用者 F5）
+  ✓ 🔴 有嘗試重新注入
+  ✓ 🔴 重新注入包含 mfood-finance-bridge.js
+  ✓ 🔴 重新注入包含 MAIN world（mfood-inject.js）
+  ✓ 🔴🔴 bridge 唔可以被注入 MAIN world（否則 window 記號被污染）
+  ✓ 🔴 bridge 要以 isolated（無 world）方式注入
+  ✓ 🔴 MAIN world 嗰次唔可以夾帶 bridge
+
+[70] 🔴🔴🔴 多帳期 → 要**逐帳期**推送去 POS（唔可以撈埋一個請求）
+  ✓ 回報成功
+  ✓ 🔴 有回報寫咗 3 個帳期
+  ✓ 🔴🔴🔴 打了 3 次 settlement（一個帳期一次）
+  ✓ 🔴 每個請求帶自己嘅帳期
+  ✓ 🔴 每個請求只帶自己嘅明細（唔可以撈埋）
+  ✓ 🔴 第一個帳期嘅實收有送到
+  ✓ 🔴 8 月嗰個帳期嘅實收都有送到
+  ✓ 🔴 每次都有帶 storeId
+
+[71] 🔴🔴 要帶「只同步此日後」（startDate）落財務頁 —— 多帳期靠佢
+  ✓ 🔴🔴 有帶 startDate 落 MFOODFIN_SYNC
+
+[72] 🔴🔴 實收對照表要落 state（popup「實收價格」靠佢）
+  ✓ 🔴 有落到 state
+  ✓ 🔴🔴 實收 = 補貼後嗰個（23.51 而唔係 35.11）
+  ✓ 有記低未補貼嘅數（對帳用）
+  ✓ 有記低屬邊個帳期
+  ✓ 🔴🔴 要累積（上一輪嘅單唔可以消失）
+  ✓ 新嗰張要喺度
+
+[73] 🔴🔴 定時自動對帳：開咗就跟同步間隔跑（唔係 6 小時）
+  ✓ 未開自動對帳：第一 tick 都會跑（舊低頻制）
+  ✓ 🔴🔴 開咗自動對帳 ⇒ tick 會對帳（唔使 autoRefresh）
+  ✓ 🔴 同一個間隔內唔可以重複跑（有節流）
+  ✓ 🔴🔴 過咗間隔（60 秒）就再跑一次
+
+[74] 🔴 GRAB_SET_AUTO_SETTLE 要真係寫入設定（唔可以淨係改 DOM）
+  ✓ 回報 ok
+  ✓ 🔴 settings.autoSettle 變 true
+  ✓ 可以關返
+  ✓ 🔴 真係寫咗落 storage
+
+[75] 🔴 推送前要由註冊表回填單號（mfood 詳情路徑嘅洞）
+  ✓ 掂得到 grabEnrichOrdersWithItems
+  ✓ 🔴 冇單號 → 要補 orderNumber 75
+  ✓ 🔴 冇單號 → 要補 localOrderNo '#75'
+  ✓ 註冊表係數字 883658 → localOrderNo '883658'
+  ✓ 🔴 已有 localOrderNo → 原樣放行（唔可以變 #75）
+  ✓ 🔴 註冊表冇 seq → orderNumber 要係 undefined
+  ✓ 🔴 註冊表冇 seq → localOrderNo 要係 undefined
+  ✓ 🔴 唔喺註冊表 → 唔可以憑空生單號
+  ✓ items 補邏輯仍然生效
+  ✓ items ＋ 單號可以同時補
+
+[76] 🔴🔴 澳覓立即對帳：GRAB_SETTLE_AOMI_NOW → AOMIFIN_SYNC → 推 POS
+  ✓ 🔴🔴 認得真機列表頁 URL（唔可以再靠 `settle` 字）
+  ✓ 🔴🔴 認得真機明細頁 URL（走訪期間換 route 唔可以掉線）
+  ✓ 🔴🔴 真機 URL 冇 `settle` 字（證明舊特徵必然失效）
+  ✓ 🔴 唔可以誤認訂單管理頁做財務頁
+  ✓ 🔴 唔可以認到 mfood 嘅頁
+  ✓ 回報成功
+  ✓ 🔴 有送 AOMIFIN_SYNC 去澳覓財務頁
+  ✓ 🔴 冇誤送 MFOODFIN_SYNC（撞錯命名空間會靜默無回應）
+  ✓ 🔴 商家名由 `aomiFinanceStoreName` 讀（唔可以讀 mfood 嗰個）
+  ✓ 🔴 有打 POS settlement 端點
+  ✓ 🔴🔴 body.source ＝ 'aomi'（POS 靠佢分平台）
+  ✓ body.storeId ＝ machineId
+  ✓ 有帶非空 transactions
+  ✓ 🔴 body.periodAmounts 帶澳覓實收
+  ✓ 有記錄上次對帳時間
+  ✓ 🔴 日誌 kind 係 aomi_settle（唔可以寫錯 mfood_settle）
+
+[77] 🔴🔴 找澳覓財務頁要用澳覓嘅 URL 特徵（唔可以搵 mfood）
+  ✓ 🔴🔴 訊息一定要送去澳覓分頁（91），唔可以送去 mfood（71）
+  ✓ 🔴 完全冇碰過 mfood 分頁
+  ✓ 🔴 query 用 `https://merchant.aomiapp.com/*`
+
+[78] 🔴 冇開澳覓財務頁 ⇒ 大聲失敗＋講清楚要開邊個頁
+  ✓ 回 ok:false
+  ✓ 🔴 講明係澳覓（唔可以講 mfood）
+  ✓ 🔴 提示頁面冇提 mfood
+  ✓ 有寫錯誤日誌
+  ✓ 🔴 未設 Store ID ⇒ ok:false
+  ✓ 🔴 講明未設定 Store ID
+  ✓ 🔴 冇亂打一個冇 storeId 嘅請求
+
+[79] 🔴🔴 多帳期（澳覓）⇒ 一樣要逐帳期推送去 POS
+  ✓ 回報成功
+  ✓ 🔴 回報寫咗 3 個帳期
+  ✓ 🔴🔴 打了 3 次 settlement（一個帳期一次）
+  ✓ 🔴 每次 source 都係 aomi
+  ✓ 🔴 每個請求帶自己嘅帳期
+  ✓ 🔴 每個請求只帶自己嘅明細
+
+[80] 🔴🔴 要帶「只同步此日後」（startDate）落澳覓財務頁（多帳期靠佢）
+  ✓ 🔴🔴 有帶 startDate
+  ✓ 有帶 targetDate（今日）
+
+[81] 🔴🔴 實收對照表（澳覓）要落 state 而且要累積
+  ✓ 🔴 有落到 aomiState.settleMap
+  ✓ 🔴 實收 ＝ netAmount（115.42）
+  ✓ 有記低屬邊個帳期
+  ✓ 🔴🔴 要累積（上一輪嘅單唔可以消失）
+  ✓ 新嗰張要喺度
+
+[82] 🔴 澳覓同 mfood 嘅 state／settings 完全獨立（唔可以互相污染）
+  ✓ 🔴 mfood state 有 mfood 嗰張
+  ✓ 🔴 aomi state 有澳覓嗰張
+  ✓ 🔴🔴 mfood state 唔可以撈到澳覓嘅單
+  ✓ 🔴🔴 aomi state 唔可以撈到 mfood 嘅單
+  ✓ 🔴 mfood 商家名冇被覆蓋
+  ✓ 🔴 澳覓商家名冇被覆蓋
+
+[83] 🔴 GRAB_SET_AUTO_SETTLE{sourceKey:'aomi'} 要寫入澳覓自己嘅 settings
+  ✓ 回報 ok
+  ✓ 🔴 回報 sourceKey ＝ aomi
+  ✓ 🔴 寫入 aomiSettings.autoSettle
+  ✓ 🔴🔴 唔可以寫錯 mfoodSettings
+  ✓ 🔴 舊呼叫（冇 sourceKey）⇒ 預設 mfood
+  ✓ 🔴 寫入 mfoodSettings
+
+[84] 🔴🔴 重新注入澳覓腳本：MAIN 只注入 inject、bridge 一定要 isolated（分兩次）
+  ✓ 掂得到 grabReinjectFinanceScripts
+  ✓ 🔴 分兩次 executeScript（唔可以合成一個 files 陣列）
+  ✓ 🔴 第一次注入 aomi-inject.js 且 world='MAIN'
+  ✓ 🔴 第二次注入 aomi-finance-bridge.js 且**冇** world（＝isolated）
+  ✓ 🔴🔴 bridge 絕對唔可以跟 inject 混同一次呼叫
+  ✓ mfood 分兩次
+  ✓ mfood inject 檔名正確
+  ✓ mfood bridge 檔名正確
+
+[85] 🔴 grabDashboard 要帶 sourceKey（popup 靠佢揀正確 storage key）
+  ✓ 有回應
+  ✓ 🔴🔴 帶 sourceKey ＝ 'aomi'（popup 靠佢揀 `aomiState`／`aomiFinanceStoreName`）
+  ✓ 有 source 欄位
+  ✓ mfood dashboard 亦有 sourceKey
+
+[86] 🔴 AOMIFIN_RAW 路由：讀澳覓財務頁已攔到嘅原始資料（唔配對）
+  ✓ 回報 ok
+  ✓ 🔴 送去財務頁嘅訊息係 AOMIFIN_RAW（唔可以係 mfood 嗰個）
+  ✓ 🔴 冇誤送 GRAB_FINANCE_RAW（mfood 專用）
+
+[87] 🔴🔴 「開啟平台後台分頁」一定要開到對帳頁（2026-09-30 使用者真機）
+  ✓ 兩頁都冇時，至少開咗一個分頁
+  ✓ 🔴🔴 有開對帳頁（finance/tackout-check）
+  ✓ 🔴🔴 訂單頁已在時，對帳頁仍然要開（本次 bug 嘅正身）
+  ✓ 訂單頁已在 → 唔好重複開訂單頁
+  ✓ 兩頁都在 → 一個都唔開
+  ✓ 🔴 澳覓訂單頁已在時，澳覓對帳頁仍然要開
+  ✓ 冇設帳密 → 唔開任何分頁
+  ✓ 🔴🔴 開分頁有寫 log（mfood_open_tabs）
+  ✓ 🔴 log 有記錄「對帳頁開咗」= true（今次係新開）
+  ✓ log 有帶兩個目標 URL
+  ✓ 🔴 log level = info（成功開到）
+  ✓ 兩頁都在 → log 記錄 openedFinancePage = false
+  ✓ 冇帳密 → 都有寫 log（唔可以靜默略過）
+
+[88] 🔴🔴 讀商家清單路由（畀商家揀店，唔使出錯）
+  ✓ 有回應
+  ✓ 🔴 路由成功
+  ✓ 🔴🔴 原樣交返清單（2 個）
+  ✓ 🔴 商家名連括號都保留（商家要認得）
+  ✓ 🔴 冇誤用其他型別（wrongType 唔應該出現）
+  ✓ 🔴🔴 發去財務頁嘅型別係 MFOODFIN_STORE_OPTIONS
+  ✓ 🔴🔴 財務頁未開 → 唔可以回 ok:true（會顯示成「後台冇店家」）
+  ✓ 🔴 要講明係「未開啟財務對帳頁」＋畀出點去
+  ✓ 🔴 唔可以攞澳覓分頁當 mfood 用（要如實話未開啟）
+  ✓ 🔴 完全冇發過任何訊息去澳覓分頁
+
+[89] 🔴🔴 同平台開多過一個分頁 → dashboard 要出聲（2026-09-30 使用者真機）
+  ✓ 有回應
+  ✓ 🔴🔴 mfood 數到 3 個分頁
+  ✓ 🔴🔴 標記 duplicateTabs = true
+  ✓ 單一分頁 ⇒ openTabCount = 1
+  ✓ 🔴 單一分頁 ⇒ 唔出警示
+  ✓ 🔴 查唔到 ⇒ openTabCount = null（唔可以當 0）
+  ✓ 🔴 查唔到 ⇒ 唔出警示
+
+[90] 🔴🔴 命令一定要送去『訂單頁』分頁（唔可以靠 state.tabId）
+  ✓ 重現真機：state.tabId 指住登入頁
+  ✓ 🔴🔴 代按查詢送去訂單頁（11）
+  ✓ 🔴 完全冇送過去登入頁（舊症狀：找不到「查詢」按鈕）
+  ✗ 🔴 抓詳情亦送去訂單頁（舊症狀：在列表中找不到這一列）
+      期望: 11
+      實際: false
+
+[91] 🔴🔴 登入乒乓：已有已登入分頁 ⇒ 唔可以再填表登入
+  ✓ 🔴🔴 唔可以再送登入請求（短時間重複登入會互踢 session）
+  ✓ 🔴 要寫 log 解釋點解唔登（唔可以靜默）
+  ✓ 對照組：真係全部未登入 ⇒ 照樣自動登入
+
+[92] 🔴🔴 卡片「重試」＝真正重試推送（重置配額＋放行去重名冊）
+  ✓ 有回應
+C:\Users\surface\Desktop\TransactionGrabberExtension\test\background-router.test.cjs:3976
+    check("🔴 attempts 歸零（否則配額用完永遠唔再試）", st.orders["202609301740088747767"].attempts, 0);
+                                                                            ^
+
+TypeError: Cannot read properties of undefined (reading 'attempts')
+    at C:\Users\surface\Desktop\TransactionGrabberExtension\test\background-router.test.cjs:3976:77
+
+Node.js v22.22.2

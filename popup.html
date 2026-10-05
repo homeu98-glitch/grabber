@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<style>
+  /* ══ redesign 視覺語言（2026-09-29 確認稿）：中性灰 + 單一品牌色 ══ */
+  :root{
+    --bg:#eef0f4;--surface:#ffffff;--surface-2:#f7f8fa;
+    --line:#e6e8ee;--line-soft:#f0f2f6;
+    --text:#171a20;--text2:#5d6470;--text3:#8f95a3;
+    --accent:#3f4fe0;--accent-d:#3040cf;--accent-s:#eef0fd;--accent-l:#c8cdf6;
+    --green:#0e9f6e;--green-s:#e6f7f0;--green-l:#b5e6d2;
+    --red:#e0424b;--red-s:#fdeeee;--red-l:#f6c6c9;
+    --amber:#c77414;--amber-s:#fdf3e4;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sh-sm:0 1px 2px rgba(18,22,33,.05);
+    --sh-md:0 1px 2px rgba(18,22,33,.05),0 4px 14px rgba(18,22,33,.07);
+    --sh-lg:0 2px 4px rgba(18,22,33,.06),0 12px 32px rgba(18,22,33,.14);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{width:460px;max-height:600px;overflow-y:auto;background:var(--bg);color:var(--text);
+    font-family:Inter,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei",sans-serif;
+    font-size:12.5px;line-height:1.55}
+  .view[hidden]{display:none}
+  /* 🔴 2026-09-29 實測捉到：`.msub{display:grid}` 呢類作者樣式會壓過 UA 嘅
+     `[hidden]{display:none}` ⇒ `el.hidden = true` 完全冇效、面板永遠展開，
+     而且 `closeMenu()` 收唔到佢（`hidden` 明明係 true，量度仲有 284×243）。
+     呢條 `!important` 係**唯一**可靠嘅做法，根治「某個 class 又壓過 hidden」呢整類 bug。 */
+  [hidden]{display:none !important}
+
+  /* ══ header ══ */
+  .apphead{padding:14px 18px 13px;border-bottom:1px solid var(--line-soft);
+    display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;position:relative;
+    background:var(--surface)}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex:none}
+  .apphead .tt{font-size:14px;font-weight:600;letter-spacing:-.01em}
+  .apphead .ss{font-size:11px;color:var(--text3);margin-top:1px}
+  .ver{font-size:10px;color:var(--text3);font-family:var(--mono)}
+  .iconbtn{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--surface);
+    color:var(--text2);cursor:pointer;font-size:14px;line-height:1;font-family:inherit;display:flex;
+    align-items:center;justify-content:center;letter-spacing:1px}
+  .iconbtn:hover{background:var(--surface-2)}
+  .iconbtn.on{background:var(--surface-2);border-color:var(--accent-l);color:var(--accent)}
+  .backbtn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:5px 10px;
+    font-size:11px;color:var(--text2);cursor:pointer;font-family:inherit}
+  .backbtn:hover{background:var(--surface-2)}
+
+  /* ══ 門店列 ══ */
+  .store{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:9px;align-items:center;
+    padding:10px 18px;background:var(--surface-2);border-bottom:1px solid var(--line-soft)}
+  .store .lab{font-size:10px;color:var(--text3);letter-spacing:.05em}
+  .store .sidwrap{min-width:0;display:flex;flex-direction:column;line-height:1.35}
+  .store .snm{font-size:11.5px;font-weight:600;color:var(--text);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .store .sid{font-size:10px;font-family:var(--mono);color:var(--text3);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .conn{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--text3);flex:none}
+  .conn.ok{color:var(--green)}
+  .conn.bad{color:var(--red)}
+  .cdot{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none}
+  .conn.bad .cdot{background:var(--red)}
+  .conn:not(.ok):not(.bad) .cdot{background:#c9ced8}
+
+  /* ══ 總控列 ══ */
+  .runctl{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;
+    padding:12px 18px;border-bottom:1px solid var(--line-soft);background:var(--surface)}
+  .runctl .state{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;white-space:nowrap}
+  .runctl .state .cdot{background:#c9ced8}
+  .runctl .state.on .cdot{background:var(--green)}
+  .runctl .hint{font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;cursor:pointer;text-align:right}
+  .runctl .hint:hover{color:var(--text2)}
+  .hintedit{display:inline-flex;gap:4px;align-items:center}
+  .hintedit input{width:56px;padding:2px 6px;font-size:11px;border:1px solid var(--line);
+    border-radius:6px;font-family:inherit;text-align:center}
+  .hintedit button{border:1px solid var(--line);background:var(--surface);border-radius:6px;
+    padding:2px 8px;font-size:10.5px;cursor:pointer;font-family:inherit}
+
+  /* ══ 按鈕 ══ */
+  .btn{border-radius:10px;padding:7px 13px;font-size:12px;font-family:inherit;font-weight:500;
+    border:1px solid var(--line);background:var(--surface);color:var(--text2);cursor:pointer;white-space:nowrap}
+  .btn:hover{background:var(--surface-2);color:var(--text)}
+  .btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.pri:hover{background:var(--accent-d);color:#fff}
+  .btn.ghost{border-color:transparent;background:transparent}
+  .btn.ghost:hover{background:var(--surface-2)}
+  .btn.sm{padding:4px 10px;font-size:11px;border-radius:8px}
+  .btn.dang{color:var(--red)}
+  .btn:disabled{opacity:.55;cursor:not-allowed}
+
+  /* ══ 平台卡 ══ */
+  .pcard{margin:12px 18px 0;border:1px solid var(--line);border-radius:14px;background:var(--surface);
+    box-shadow:var(--sh-sm);overflow:hidden}
+  .pcard.dim{background:var(--surface-2);box-shadow:none}
+  .phead{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 14px 10px}
+  .pname{font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px}
+  .phost{font-size:10.5px;color:var(--text3);font-family:var(--mono);margin-top:1px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pdot{width:8px;height:8px;border-radius:50%;flex:none}
+  .pdot.ok{background:var(--green)}
+  .pdot.off{background:#c9ced8}
+  .pdot.err{background:var(--red)}
+  .pdot.wait{background:#e8a33d}
+
+  .kv{display:grid;grid-template-columns:76px minmax(0,1fr);gap:4px 10px;padding:2px 14px 12px;
+    border-top:1px solid var(--line-soft);margin-top:9px;padding-top:11px}
+  .kv .k{font-size:11px;color:var(--text3);padding-top:1px}
+  .kv .v{font-size:11.5px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kv .v.mono{font-family:var(--mono);font-size:10.5px;color:var(--text2)}
+  .kv .v.dimmed{color:var(--text3)}
+  .kv .v .hl{color:var(--green);font-weight:500}
+  .kv .v.bad{color:var(--red)}
+
+  .pfoot{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;
+    padding:9px 14px;background:var(--surface-2);border-top:1px solid var(--line-soft)}
+  .pfoot .lg{font-size:10.5px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pfoot .lg.ok{color:var(--green)}
+  .pfoot .lg.err{color:var(--red)}
+
+  /* ══ 同平台多分頁警示（2026-09-30 使用者真機） ══
+     多開同平台分頁會令 state.tabId／tabs[0] 揀錯分頁 ⇒「有時得有時唔得」。
+     呢個係必須由使用者糾正嘅事項，所以要顯眼（用 amber，唔用 red —— 唔係故障）。 */
+  .dupwarn{margin:0 14px 10px;padding:8px 10px;border-radius:8px;
+    background:var(--amber-s);border:1px solid rgba(199,116,20,.28)}
+  .dupwarn .dw-t{font-size:11.5px;font-weight:600;color:var(--amber);margin-bottom:3px}
+  .dupwarn .dw-b{font-size:10.5px;line-height:1.55;color:var(--text2)}
+  .dupwarn .dw-b b{color:var(--text);font-weight:600}
+
+  /* ══ 開關 ══ */
+  /* 🔴🔴 2026-10-02：toggle 冇滑動動畫嘅根因 —— 個 knob 寫死 left:19px，
+     off 狀態又冇規則將佢移返去左邊，所以切換時淨係轉色唔滑動。
+     ⇒ 改由原生 checkbox 嘅 :checked 狀態驅動：off = 左、checked = 右，
+     加 transition 就有動畫（點擊即時反應，唔受每 2 秒 re-render 影響）。 */
+  .sw{position:relative;width:38px;height:22px;flex:none;display:inline-block;cursor:pointer}
+  .sw input{opacity:0;width:0;height:0;position:absolute;left:0;top:0;margin:0}
+  .sw .sl{position:absolute;inset:0;background:#c9ced8;border-radius:22px;transition:background .18s ease}
+  .sw .sl:after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(18,22,33,.2);transition:left .18s cubic-bezier(.4,0,.2,1)}
+  .sw input:checked + .sl{background:var(--green)}
+  .sw input:checked + .sl:after{left:19px}
+  /* .off 類只作舊相容／灰底兜底，滑動一律交返 :checked 處理 */
+  .sw.off .sl{background:#c9ced8}
+
+  /* ══ 統計 ══ */
+  .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:14px 18px 0}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 6px;text-align:center}
+  .stat .k{display:block;font-size:10px;color:var(--text3);margin-bottom:2px}
+  .stat .v{display:block;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .stat .v.errv{color:var(--red)}
+
+  /* ══ 區塊標題 ══ */
+  .sechead{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;
+    margin:16px 18px 8px}
+  .sechead .t{font-size:12px;font-weight:600}
+  .sechead .c{font-size:10.5px;color:var(--text3);font-family:var(--mono);display:inline-flex;gap:8px;align-items:center}
+
+  /* ══ 日誌 ══ */
+  .logbox{margin:0 18px;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+  .logtabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:1px solid var(--line-soft)}
+  .logtabs .lt{padding:7px 4px;text-align:center;font-size:11px;color:var(--text3);cursor:pointer;
+    border-bottom:2px solid transparent}
+  .logtabs .lt.on{color:var(--text);border-bottom-color:var(--accent);font-weight:500}
+  .loglist{max-height:176px;overflow-y:auto}
+  .litem{padding:8px 13px;border-bottom:1px solid var(--line-soft);display:grid;
+    grid-template-columns:auto minmax(0,1fr) auto;gap:9px;align-items:baseline}
+  .litem:last-child{border-bottom:none}
+  .ldot{width:7px;height:7px;border-radius:50%;flex:none;align-self:center}
+  .ldot.ok{background:var(--green)}
+  .ldot.new{background:var(--accent)}
+  .ldot.err{background:var(--red)}
+  .ldot.info{background:#c9ced8}
+  .lmsg{font-size:11.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lmsg b{color:var(--text);font-weight:500}
+  .ltime{font-size:10px;color:var(--text3);font-family:var(--mono);flex:none}
+  .lempty{padding:22px 13px;text-align:center;font-size:11px;color:var(--text3)}
+
+  /* ══ 工具選單 ══ */
+  .menu{position:absolute;top:48px;right:12px;width:286px;background:var(--surface);border:1px solid var(--line);
+    border-radius:14px;box-shadow:var(--sh-lg);z-index:30;overflow:hidden;overflow-y:auto;max-height:520px}
+  .menu .mhead{padding:10px 14px 8px;font-size:10.5px;color:var(--text3);border-bottom:1px solid var(--line-soft)}
+  .mitem{display:grid;grid-template-columns:20px minmax(0,1fr);gap:10px;padding:9px 14px;cursor:pointer}
+  .mitem:hover{background:var(--surface-2)}
+  .mitem .mi{font-size:13px;color:var(--text2);text-align:center;line-height:1.3}
+  .mitem .ml{font-size:12px;font-weight:500}
+  .mitem .ms{font-size:10px;color:var(--text3);margin-top:1px;line-height:1.45}
+  .mitem.dang .ml,.mitem.dang .mi{color:var(--red)}
+  .msep{border-top:1px solid var(--line-soft)}
+  .msub{padding:10px 14px 12px;background:var(--surface-2);border-top:1px solid var(--line-soft);
+    display:grid;gap:8px}
+  .msub .mt{font-size:11px;font-weight:600;color:var(--text2)}
+
+  /* ══ 精靈 ══ */
+  .wsteps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;padding:14px 18px 4px;
+    background:var(--surface)}
+  .wstep-i{display:flex;flex-direction:column;gap:6px;align-items:flex-start;position:relative;padding-right:10px}
+  .wstep-i .bar{height:3px;border-radius:2px;background:var(--line);width:100%}
+  .wstep-i.done .bar{background:var(--green)}
+  .wstep-i.on .bar{background:var(--accent)}
+  .wstep-i .lb{font-size:10.5px;color:var(--text3);display:flex;gap:5px;align-items:center}
+  .wstep-i.on .lb{color:var(--text);font-weight:500}
+  .wstep-i.done .lb{color:var(--green)}
+  .wnum{width:15px;height:15px;border-radius:50%;background:var(--line);color:#fff;font-size:9px;
+    display:inline-flex;align-items:center;justify-content:center;font-weight:600}
+  .wstep-i.on .wnum{background:var(--accent)}
+  .wstep-i.done .wnum{background:var(--green)}
+  .wnum.skip{background:transparent;border:1px dashed var(--text3);color:var(--text3)}
+
+  .wcard{margin:10px 18px 0;border:1px solid var(--line);border-radius:14px;background:var(--surface);
+    box-shadow:var(--sh-sm);padding:14px}
+  .wcard:last-of-type{margin-bottom:12px}
+  .wttl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;margin-bottom:10px}
+  .wttl .n{font-size:12.5px;font-weight:600}
+  .wttl .s{font-size:10.5px;color:var(--text3);margin-top:1px}
+  .skipchip{font-size:10px;color:var(--text3);border:1px dashed var(--line);border-radius:999px;padding:2px 9px}
+  .skipchip.used{border-style:solid;background:var(--surface-2);color:var(--text2)}
+  .wbody.dimmed{opacity:.55}
+  .f{display:grid;gap:4px;margin-bottom:8px}
+  .f>label{font-size:11px;color:var(--text2);font-weight:500}
+  .inp{width:100%;padding:8px 11px;font-size:12px;border:1px solid var(--line);border-radius:10px;
+    background:var(--surface);color:var(--text);font-family:inherit;min-height:38px}
+  .inp:focus{outline:2px solid var(--accent-l);outline-offset:-1px}
+  .inp.mono{font-family:var(--mono);font-size:11px}
+  .inp-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+  .inp-row .btn{min-height:38px}
+  .vres{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;
+    border-top:1px solid var(--line-soft);margin-top:2px;padding-top:9px;font-size:11px}
+  .vres.ok{color:var(--green)}
+  .vres.idle{color:var(--text3)}
+  .vres.err{color:var(--red)}
+  .vres .vn{font-size:11.5px;font-weight:600;color:var(--text);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .vres .vbadge{font-size:10px;color:var(--green);background:var(--green-s);
+    border-radius:999px;padding:2px 8px;flex:none}
+  .ptest{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;
+    border-top:1px solid var(--line-soft);padding-top:9px;margin-top:2px}
+  .pres{font-size:11px;display:flex;align-items:center;gap:6px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .pres.ok{color:var(--green)}
+  .pres.err{color:var(--red)}
+  .pres.idle{color:var(--text3)}
+  .wadv{border-top:1px dashed var(--line);margin-top:10px;padding-top:8px}
+  .wadv>summary{cursor:pointer;font-size:11px;color:var(--text3);list-style:none;display:flex;gap:6px;align-items:center}
+  .wadv>summary::-webkit-details-marker{display:none}
+  .wadv .abody{padding-top:8px;display:grid;gap:8px}
+  .chkrow{display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--text2)}
+  .wfoot{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;
+    padding:2px 18px 16px}
+
+  /* ══ 訂單明細 ══ */
+  .olist{margin:0 18px;border:1px solid var(--line);border-radius:14px;background:var(--surface);
+    box-shadow:var(--sh-sm);overflow-y:auto;max-height:300px}
+  .ocard{padding:13px 14px 12px;border-bottom:1px solid var(--line-soft)}
+  .ocard:last-child{border-bottom:none}
+  .ohead{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;margin-bottom:3px}
+  .onumwrap{display:flex;align-items:center;gap:7px;min-width:0}
+  .osrc{font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:6px;flex:none;letter-spacing:.02em}
+  .osrc.m{background:var(--amber-s);color:var(--amber)}
+  .osrc.a{background:var(--accent-s);color:var(--accent)}
+  .osrc.p{background:var(--green-s);color:var(--green)}
+  .ono{font-size:11px;font-weight:500;font-family:var(--mono);color:var(--text);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ost{font-size:10px;display:inline-flex;align-items:center;gap:5px;flex:none;color:var(--green)}
+  .ost.bad{color:var(--red)}
+  .ost.wait{color:var(--amber)}
+  .ost.mute{color:var(--text3)}
+  .ometa{font-size:10.5px;color:var(--text3);margin-bottom:9px}
+  .itbl{border-top:1px solid var(--line-soft);padding-top:8px;display:grid;gap:1px}
+  .irow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:baseline}
+  .iname{font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .iqty{font-size:10.5px;color:var(--text3);font-family:var(--mono);flex:none}
+  .iprice{font-size:11.5px;font-variant-numeric:tabular-nums;flex:none;text-align:right}
+  .osum{border-top:1px solid var(--line-soft);margin-top:7px;padding-top:8px;display:grid;gap:3px}
+  .sline{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:baseline;font-size:11px}
+  .sline .k{color:var(--text2)}
+  .sline .v{font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:10.5px;color:var(--text2)}
+  .sline.strong{border-top:1px solid var(--line-soft);padding-top:6px;margin-top:3px}
+  .sline.strong .k{color:var(--text);font-weight:600}
+  .sline.strong .v{color:var(--text);font-weight:600;font-size:12px}
+  .sline.net .v{color:var(--green);font-weight:600}
+  .ofoot{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;
+    border-top:1px solid var(--line-soft);margin-top:9px;padding-top:9px}
+  .ostate{font-size:10.5px;color:var(--text3)}
+  .ostate.ok{color:var(--green)}
+  .ostate.err{color:var(--red)}
+  .oerr{font-size:10px;color:var(--red);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* Mpay 交易列 */
+  .mplist{margin:0 18px;border:1px solid var(--line);border-radius:14px;background:var(--surface);
+    box-shadow:var(--sh-sm);overflow-y:auto;max-height:220px}
+  .mprow{padding:9px 13px;border-bottom:1px solid var(--line-soft);display:grid;
+    grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:baseline}
+  .mprow:last-child{border-bottom:none}
+  .mpno{font-size:11px;font-family:var(--mono);color:var(--text);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .mpmeta{font-size:10px;color:var(--text3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mpst{font-size:10px;flex:none}
+  .mpst.ok{color:var(--green)}
+  .mpst.bad{color:var(--red)}
+  .mpamt{font-size:11.5px;font-weight:500;font-family:var(--mono);font-variant-numeric:tabular-nums;flex:none}
+  .empty{padding:26px 10px;text-align:center;color:var(--text3);font-size:11px}
+</style>
+</head>
+<body>
+
+<!-- ════════ 主面板 ════════ -->
+<div class="view" id="view-main">
+  <div class="apphead">
+    <div style="display:flex;gap:10px;align-items:center;min-width:0">
+      <div class="logo">TG</div>
+      <div style="min-width:0">
+        <div class="tt">Transaction Grabber</div>
+        <div class="ss" id="mainSub">mfood ＋ 澳覓 → macau-pos</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:7px;align-items:center;position:relative">
+      <span class="ver" id="ver">v—</span>
+      <button class="iconbtn" id="menuBtn" title="手動測試與維運工具">⋯</button>
+      <div class="menu" id="toolMenu" hidden>
+        <div class="mhead">手動測試與維運工具</div>
+        <div class="mitem" id="miRescan">
+          <span class="mi">↻</span>
+          <div><div class="ml">立即掃描一次</div><div class="ms">不等 30 秒，兩平台立刻重掃訂單與對帳</div></div>
+        </div>
+        <div class="mitem" id="miLoginAll">
+          <span class="mi">⇄</span>
+          <div><div class="ml">測試登入（全部平台）</div><div class="ms">開登入頁 → 自動填表提交 → 逐個回報</div></div>
+        </div>
+        <div class="mitem" id="miOpenTabs">
+          <span class="mi">⌖</span>
+          <div><div class="ml">開啟平台後台分頁</div><div class="ms">補開訂單頁與對帳頁（背景開，唔搶焦點）</div></div>
+        </div>
+        <div class="mitem" id="miExport">
+          <span class="mi">⤓</span>
+          <div><div class="ml">匯出日誌（JSON）</div><div class="ms">下載觀察日誌，供排查與回報</div></div>
+        </div>
+        <div class="mitem" id="miFinance">
+          <span class="mi">﹪</span>
+          <div><div class="ml">對帳設定</div><div class="ms">商家名／自動對帳／立即對帳</div></div>
+        </div>
+        <div class="mitem" id="miDev">
+          <span class="mi">⚙</span>
+          <div><div class="ml">開發者工具</div><div class="ms">假訂單、診斷、清除資料</div></div>
+        </div>
+        <div class="msep"></div>
+        <div class="mitem dang" id="miResetSeen">
+          <span class="mi">⌫</span>
+          <div><div class="ml">清除去重記錄</div><div class="ms">已擷取過的訂單會被當成新單再推送一次</div></div>
+        </div>
+        <div class="mitem dang" id="miClearLog">
+          <span class="mi">×</span>
+          <div><div class="ml">清空運行日誌</div><div class="ms">刪除全部日誌紀錄，不影響訂單資料</div></div>
+        </div>
+        <div class="mitem dang" id="miLogout">
+          <span class="mi">⎋</span>
+          <div><div class="ml">登出並清除本機資料</div><div class="ms">刪除 Store ID、mfood／澳覓帳密與設定，回到首次設定精靈</div></div>
+        </div>
+
+        <!-- 對帳設定展開區 -->
+        <div class="msub" id="financeSub" hidden>
+          <div class="mt">mfood 對帳</div>
+          <!-- 🔴🔴 2026-09-30：商家名改為**由後台下拉清單揀**，唔再要商家打。
+               原由：真機 80/80 都對唔上 —— 後台商家名係「表嫂美食(蒸煎手打肉餅,
+               酸菜魚,沙薑雞飯)」呢種長名，手打一定打錯。後台本身有得揀。 -->
+          <div class="inp-row">
+            <input class="inp" id="financeStoreName" readonly placeholder="未選擇（留空＝用後台預設）">
+            <button class="btn sm" id="loadStoreOptions">載入商家</button>
+          </div>
+          <div class="ms" id="storeOptHint" style="font-size:10px;color:var(--text3);line-height:1.5">撳「載入商家」由後台列出可選店家，再撳一下選定</div>
+          <div id="storeOptList" hidden style="display:grid;gap:4px;margin-top:2px;max-height:150px;overflow:auto"></div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;margin-top:2px">
+            <label class="chkrow"><input type="checkbox" id="autoSettle"> 定時自動對帳（跟同步間隔）</label>
+            <button class="btn sm" id="settleNowBtn">立即對帳</button>
+          </div>
+          <div class="ms" id="settleHint" style="font-size:10px;color:var(--text3);line-height:1.5"></div>
+          <div class="mt" style="margin-top:4px">澳覓對帳</div>
+          <input class="inp" id="aomiFinanceStoreName" placeholder="本店澳覓商家名（留空＝用後台預設）">
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center">
+            <label class="chkrow"><input type="checkbox" id="aomiAutoSettle"> 定時自動對帳（跟同步間隔）</label>
+            <button class="btn sm" id="aomiSettleNowBtn">立即對帳</button>
+          </div>
+          <div class="ms" id="aomiSettleHint" style="font-size:10px;color:var(--text3);line-height:1.5"></div>
+        </div>
+
+        <!-- 開發者工具展開區 -->
+        <div class="msub" id="devSub" hidden>
+          <div class="mt">開發者工具（一般唔需要撳）</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <button class="btn sm" id="fakeOrderMfood">建假訂單（MFOOD）</button>
+            <button class="btn sm" id="fakeOrderAomi">建假訂單（澳覓）</button>
+            <button class="btn sm" id="syncRangeNow">套用日期並抓全部</button>
+            <button class="btn sm dang" id="clearAllOrders">清除所有訂單</button>
+            <button class="btn sm" id="settleDomDump">對帳頁結構診斷</button>
+            <button class="btn sm" id="settleForensic">財務請求 host 取證</button>
+            <button class="btn sm" id="dumpAllOrders" style="grid-column:1/3">拿全部訂單（複製 JSON）</button>
+            <button class="btn sm" id="copyDiag" style="grid-column:1/3">複製診斷</button>
+          </div>
+          <label class="f" style="margin:0">
+            <label>假訂單張數（1–20）</label>
+            <input class="inp" type="number" id="fakeOrderCount" value="1" min="1" max="20">
+          </label>
+          <div class="ms" id="devHint" style="font-size:10px;color:var(--text3);line-height:1.5"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="store">
+    <span class="lab">門店</span>
+    <span class="sidwrap">
+      <span class="snm" id="storeNameTop">未設定門店</span>
+      <span class="sid" id="storeIdTop">按「切換」輸入 Store ID</span>
+    </span>
+    <span class="conn" id="storeConn"><span class="cdot"></span>未驗證</span>
+    <button class="btn ghost sm" id="btnSwitchStore">切換</button>
+  </div>
+
+  <div class="runctl">
+    <span class="state" id="runState"><span class="cdot"></span>讀取中…</span>
+    <span class="hint" id="runHint" title="點擊修改同步間隔">—</span>
+    <!-- 🔴🔴 2026-09-30：呢粒掣係「訂單明細」嘅**唯一入口**。
+         之前 `#view-detail` / `renderDetail()` 全部整好晒，但**冇任何掣開得到佢**
+         ⇒ 使用者問「我怎樣看到訂單明細?」。反向接線檢查（HTML 可撳控件有冇被 js 碰過）
+         補上之後，就係呢粒掣一直冇存在。加咗之後記得同步加 popup.js 嘅接線。 -->
+    <button class="btn ghost sm" id="btnOrders" title="睇兩平台擷取到嘅訂單卡 + Mpay 最近交易">訂單明細</button>
+    <button class="btn sm" id="btnRun">開始</button>
+  </div>
+
+  <div id="cards"></div>
+
+  <div class="stats">
+    <div class="stat"><span class="k">已推送</span><span class="v" id="stSent">0</span></div>
+    <div class="stat"><span class="k">重複跳過</span><span class="v" id="stDup">0</span></div>
+    <div class="stat"><span class="k">失敗</span><span class="v" id="stFail">0</span></div>
+    <div class="stat"><span class="k">待處理</span><span class="v" id="stPend">0</span></div>
+  </div>
+
+  <div class="sechead"><span class="t">運行日誌</span><span class="c" id="logCount">—</span></div>
+  <div class="logbox">
+    <div class="logtabs" id="logTabs">
+      <div class="lt on" data-log="all">全部</div>
+      <div class="lt" data-log="mfood">mfood</div>
+      <div class="lt" data-log="aomi">澳覓</div>
+    </div>
+    <div class="loglist" id="logList"><div class="lempty">尚無事件</div></div>
+  </div>
+  <div style="height:12px"></div>
+</div>
+
+<!-- ════════ 訂單明細 ════════ -->
+<div class="view" id="view-detail" hidden>
+  <div class="apphead">
+    <div style="display:flex;gap:10px;align-items:center;min-width:0">
+      <div class="logo">TG</div>
+      <div style="min-width:0">
+        <div class="tt">Transaction Grabber</div>
+        <div class="ss">訂單明細</div>
+      </div>
+    </div>
+    <button class="backbtn" id="btnBackMain">‹ 主面板</button>
+  </div>
+
+  <div class="store">
+    <span class="lab">門店</span>
+    <span class="sidwrap">
+      <span class="snm" id="storeNameDet">未設定門店</span>
+      <span class="sid" id="storeIdDet">—</span>
+    </span>
+    <span class="conn" id="storeConnDet"><span class="cdot"></span>未驗證</span>
+    <button class="btn ghost sm" id="btnDetailSwitch">切換</button>
+  </div>
+
+  <div class="sechead"><span class="t">擷取到的訂單</span><span class="c" id="dCount">—</span></div>
+  <div class="olist" id="dList"><div class="empty">讀取中…</div></div>
+
+  <div class="sechead">
+    <span class="t">Mpay 最近交易</span>
+    <span class="c"><span id="mpTimer">—</span><button class="btn ghost sm" id="mpRefresh">手動刷新</button></span>
+  </div>
+  <div class="mplist" id="mpList"><div class="empty">尚無資料</div></div>
+  <div style="height:12px"></div>
+</div>
+
+<!-- ════════ 設定精靈 ════════ -->
+<div class="view" id="view-wizard" hidden>
+  <div class="apphead">
+    <div style="display:flex;gap:10px;align-items:center;min-width:0">
+      <div class="logo">TG</div>
+      <div style="min-width:0">
+        <div class="tt">Transaction Grabber</div>
+        <div class="ss">訂單擷取與對帳同步 · 設定</div>
+      </div>
+    </div>
+    <button class="backbtn" id="btnWizardCancel">取消</button>
+  </div>
+
+  <div class="wsteps" id="wsteps">
+    <div class="wstep-i" data-step="store"><div class="bar"></div><div class="lb"><span class="wnum">1</span>門店</div></div>
+    <div class="wstep-i" data-step="mfood"><div class="bar"></div><div class="lb"><span class="wnum">2</span>mfood</div></div>
+    <div class="wstep-i" data-step="aomi"><div class="bar"></div><div class="lb"><span class="wnum">3</span>澳覓</div></div>
+    <div class="wstep-i" data-step="rate"><div class="bar"></div><div class="lb"><span class="wnum">4</span>頻率</div></div>
+  </div>
+
+  <div class="wcard">
+    <div class="wttl">
+      <div>
+        <div class="n">門店識別</div>
+        <div class="s">三個平台共用 · 必填</div>
+      </div>
+      <span class="skipchip" id="wizStoreChip">未驗證</span>
+    </div>
+    <div class="f">
+      <label for="wizStoreId">Store ID</label>
+      <div class="inp-row">
+        <input class="inp mono" id="wizStoreId" placeholder="例如 8291f843-9def-4956-9d0b-1cfef2598306">
+        <button class="btn" id="wizVerifyBtn">驗證門店</button>
+      </div>
+    </div>
+    <div class="vres idle" id="wizStoreRes">
+      <span class="cdot"></span>
+      <span class="vn">輸入後按「驗證門店」確認店名</span>
+      <span></span>
+    </div>
+  </div>
+
+  <div class="wcard" id="wcardMfood">
+    <div class="wttl">
+      <div>
+        <div class="n">mfood 帳號</div>
+        <div class="s">merchant.mfoodapp.com</div>
+      </div>
+      <button class="btn ghost sm" id="wizMfoodSkip" style="color:var(--text3)">跳過此平台</button>
+    </div>
+    <div class="wbody" id="wbodyMfood">
+      <div class="f">
+        <label for="wizMfoodUser">帳號</label>
+        <input class="inp" id="wizMfoodUser" autocomplete="off">
+      </div>
+      <div class="f">
+        <label for="wizMfoodPass">密碼</label>
+        <input class="inp" id="wizMfoodPass" type="password" placeholder="已儲存過可留空（密碼不變）">
+      </div>
+      <details class="wadv">
+        <summary>▸ 對帳選項（可留空）</summary>
+        <div class="abody">
+          <!-- 🔴🔴 2026-09-30：同主面板一致 —— 由後台清單揀，唔再手打。 -->
+          <div class="inp-row">
+            <input class="inp" id="wizMfoodFinance" readonly placeholder="未選擇（留空＝用後台預設）">
+            <button class="btn sm" id="wizLoadStoreOptions">載入商家</button>
+          </div>
+          <div class="ms" id="wizStoreOptHint" style="font-size:10px;color:var(--text3);line-height:1.5">撳「載入商家」由後台列出可選店家，再撳一下選定</div>
+          <div id="wizStoreOptList" hidden style="display:grid;gap:4px;margin-top:2px;max-height:150px;overflow:auto"></div>
+          <label class="chkrow"><input type="checkbox" id="wizMfoodAutoSettle"> 定時自動對帳（跟同步間隔）</label>
+        </div>
+      </details>
+      <div class="ptest">
+        <div class="pres idle" id="wizMfoodRes"><span class="cdot"></span>填寫後點「測試登入」立即驗證</div>
+        <button class="btn pri sm" id="wizMfoodTest">測試登入</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wcard" id="wcardAomi">
+    <div class="wttl">
+      <div>
+        <div class="n">澳覓帳號</div>
+        <div class="s">merchant.aomiapp.com</div>
+      </div>
+      <button class="btn ghost sm" id="wizAomiSkip" style="color:var(--text3)">跳過此平台</button>
+    </div>
+    <div class="wbody" id="wbodyAomi">
+      <div class="f">
+        <label for="wizAomiUser">帳號</label>
+        <input class="inp" id="wizAomiUser" autocomplete="off">
+      </div>
+      <div class="f">
+        <label for="wizAomiPass">密碼</label>
+        <input class="inp" id="wizAomiPass" type="password" placeholder="已儲存過可留空（密碼不變）">
+      </div>
+      <details class="wadv">
+        <summary>▸ 對帳選項（可留空）</summary>
+        <div class="abody">
+          <input class="inp" id="wizAomiFinance" placeholder="本店澳覓商家名（對帳用，留空＝用後台預設）">
+          <label class="chkrow"><input type="checkbox" id="wizAomiAutoSettle"> 定時自動對帳（跟同步間隔）</label>
+        </div>
+      </details>
+      <div class="ptest">
+        <div class="pres idle" id="wizAomiRes"><span class="cdot"></span>填寫後點「測試登入」立即驗證</div>
+        <button class="btn pri sm" id="wizAomiTest">測試登入</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wcard">
+    <div class="wttl">
+      <div>
+        <div class="n">掃描頻率</div>
+        <div class="s">兩平台共用 · 預設 30 秒</div>
+      </div>
+    </div>
+    <div class="f">
+      <label for="wizInterval">訂單／對帳掃描間隔（秒）</label>
+      <input class="inp" id="wizInterval" type="number" value="30" min="5" step="1" style="text-align:center">
+    </div>
+    <div class="f" style="margin-bottom:0">
+      <label for="wizStartDate">只同步此日後（可留空）</label>
+      <input class="inp" id="wizStartDate" type="date" title="只同步此日期之後的訂單，用來避開系統上線前的歷史資料">
+    </div>
+  </div>
+
+  <div class="wfoot">
+    <button class="btn ghost" id="wizBack" style="color:var(--text3)">上一步</button>
+    <span></span>
+    <button class="btn pri" id="wizFinish">完成設定並啟動</button>
+  </div>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+{
+  "manifest_version": 3,
+  "name": "Transaction Grabber",
+  "version": "1.82",
+  "description": "擷取 MacauPay 交易、澳覓與 mfood 商戶後台訂單，轉送到你的 POS 系統。",
+  "permissions": [
+    "alarms",
+    "storage",
+    "notifications",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://msp.macaupay.com.mo/*",
+    "https://merchant.aomiapp.com/*",
+    "https://*.mfoodapp.com/*",
+    "https://macau-pos-system.vercel.app/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://merchant.aomiapp.com/*"
+      ],
+      "js": [
+        "aomi-inject.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://merchant.aomiapp.com/*"
+      ],
+      "js": [
+        "aomi-bridge.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://merchant.aomiapp.com/*"
+      ],
+      "js": [
+        "aomi-finance-bridge.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://*.mfoodapp.com/*"
+      ],
+      "js": [
+        "mfood-inject.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://*.mfoodapp.com/*"
+      ],
+      "js": [
+        "mfood-bridge.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://*.mfoodapp.com/*"
+      ],
+      "js": [
+        "mfood-finance-bridge.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://merchant.aomiapp.com/*",
+        "https://*.mfoodapp.com/*"
+      ],
+      "js": [
+        "login.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
